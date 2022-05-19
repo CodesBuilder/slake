@@ -1,0 +1,35 @@
+@version 100;
+
+var CC="clang";
+var LD="lld -flavor gnu";
+
+var CP=?;
+var MKDIR=?;
+var RM=?;
+
+function constructor():
+	switch(__OS__):
+		case "WINNT":
+			CP="copy";
+			MKDIR="mkdir";
+			RM="del";
+		end
+		case "UNIXLIKE":
+			CP="cp";
+			MKDIR="mkdir";
+			RM="rm";
+		end
+		default:
+			%error "Incompatible OS type.";
+			%abort -1;
+		end
+	end
+end
+
+entry function all():
+
+end
+
+private function compile_c(indir,filename,outdir):
+
+end
