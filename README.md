@@ -1,5 +1,5 @@
-# Hiked Make (HIKE)
+# Slake
 
-## What is it?
+## Introduction
 
-Hiked Make (HIKE) is a build tool inspired by make and various programming language.
+Slake is a build tool inspired by MAKE and various build tools.

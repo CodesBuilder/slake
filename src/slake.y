@@ -4,17 +4,17 @@
 #include <string.h>
 %}
 
-%define api.prefix hk
+%define api.prefix slake
 
 %code requires {
-#include <hakedef.h>
+#include <slakedef.h>
 
-extern FILE* hkin;
-extern int hklineno;
+extern FILE* slakein;
+extern int slakelineno;
 
-int hklex();
-int hkparse();
-void hkerror(const char* msg, ...);
+int slakelex();
+int slakeparse();
+void slakeerror(const char* msg, ...);
 }
 
 %union
@@ -38,6 +38,8 @@ void hkerror(const char* msg, ...);
 %token SIGN_LPARENTHESE '('
 %token SIGN_RPARENTHESE ')'
 %token SIGN_NEWLINE '\n'
+%token SIGN_LBRACE '{'
+%token SIGN_RBRACE '}'
 
 // Tokens.
 %token <str> SYMBOL
@@ -59,23 +61,22 @@ void hkerror(const char* msg, ...);
 %%
 
 statements:
-statements expr|
-expr |
+statements statement|
+statement |
 ;
 
-expr:
-superCommand|
-funcDeclare|
-varDeclare ';' |
-funcCall ';' |
+statement:
+superCommand ';'|
+funcDecl|
+varDecls ';'
 ;
 
 // Super command.
 superCommand:
-'@' SYMBOL ';'
+'@' SYMBOL
 {
 }|
-'@' SYMBOL superCommandParam ';'
+'@' SYMBOL superCommandParam
 {
 }
 ;
@@ -90,10 +91,12 @@ value
 };
 
 // Function declaration.
-funcDeclare:
-"function" SYMBOL '(' paramDef ')' ':'
+funcDecl:
+"function" SYMBOL '(' paramDef ')' '{' funcBody '}'
 {
 }
+
+funcBody: funcBody expr | expr;
 
 // Wrap for parameter definitions.
 paramDef:
@@ -102,8 +105,30 @@ paramDef ',' SYMBOL
 }|
 SYMBOL
 {
-}
+}|
 ;
+
+// General expression.
+expr:
+funcCall|
+assignments ';';
+
+// Assignment
+assignments:
+assignments ',' assignment|
+assignment
+;
+
+assignment:
+SYMBOL '=' SYMBOL
+{
+}|
+SYMBOL '=' value
+{
+}|
+SYMBOL '=' '?'
+{
+}|
 
 // Function call.
 funcCall:
@@ -125,23 +150,23 @@ value
 };
 
 // Variable declaration.
-varDeclare:
-"var" SYMBOL '=' value
+varDecls:
+"var" varDecls ',' varDecl |
+"var" varDecl
+
+varDecl:
+SYMBOL '=' value
 {
 
 }|
-"var" SYMBOL '=' '?'
+SYMBOL '=' '?'
 {
 
 }|
-varDeclare ',' SYMBOL '=' value
+SYMBOL '=' SYMBOL
 {
 
-}|
-varDeclare ',' SYMBOL '=' '?'
-{
-
-};
+}
 
 // Wrap for values.
 value:

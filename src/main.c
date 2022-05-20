@@ -1,17 +1,17 @@
 #include <stdio.h>
 #include <stdarg.h>
-#include <hake.tab.h>
-#include <hakedef.h>
+#include <slake.tab.h>
+#include <slakedef.h>
 
-extern FILE* hkin;
-extern int hklineno;
+extern FILE* slakein;
+extern int slakelineno;
 
-void hkerror(const char *s,...)
+void slakeerror(const char *s,...)
 {
 	va_list vargs;
 	va_start(vargs,s);
 
-	fprintf(stderr,"Error at line %d: ",hklineno);
+	fprintf(stderr,"Error at line %d: ",slakelineno);
 	fprintf(stderr,s,vargs);
 	fputs("\n",stderr);
 
@@ -28,15 +28,15 @@ int main(int argc,char** argv)
 
 	const char* src_filename=argv[1];
 
-	if((hkin=fopen(src_filename,"rb"))==NULL)
+	if((slakein=fopen(src_filename,"rb"))==NULL)
 	{
 		printf("Error: Error opening file:%s\n",src_filename);
 		return 1;
 	}
 
-	hkparse();
+	slakeparse();
 
-	fclose(hkin);
+	fclose(slakein);
 
 	return 0;
 }

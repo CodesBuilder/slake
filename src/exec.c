@@ -4,7 +4,7 @@
 #include <Windows.h>
 #endif
 
-int hkExec(const char *cmdline)
+int slakeExec(const char *cmdline)
 {
 #ifdef _WIN32
 	STARTUPINFOA si;

@@ -1,5 +1,5 @@
-#ifndef __HAKEDEF_H__
-#define __HAKEDEF_H__
+#ifndef __SLAKEDEF_H__
+#define __SLAKEDEF_H__
 
 typedef enum _HkValueType
 {
