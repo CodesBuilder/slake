@@ -4,7 +4,7 @@
 #include <string.h>
 %}
 
-%define api.prefix slake
+%define api.prefix {slake}
 
 %code requires {
 #include <slakedef.h>
@@ -24,31 +24,65 @@ void slakeerror(const char* msg, ...);
 	unsigned int u32;
 	long long i64;
 	unsigned long long u64;
-	HkValue value;
+	SlakeValue value;
 }
 
-//
-// Signs.
-//
-%token SIGN_AT '@'
-%token SIGN_COLON ':'
-%token SIGN_SEMICOLON ';'
-%token SIGN_COMMA ','
-%token SIGN_DOLLAR '$'
-%token SIGN_LPARENTHESE '('
-%token SIGN_RPARENTHESE ')'
-%token SIGN_NEWLINE '\n'
-%token SIGN_LBRACE '{'
-%token SIGN_RBRACE '}'
+// Tokens
+%token T_AT '@'
+%token T_COLON ':'
+%token T_SEMICOLON ';'
+%token T_COMMA ','
+%token T_DOLLAR '$'
+%token T_LPARENTHESE '('
+%token T_RPARENTHESE ')'
+%token T_LBRACE '{'
+%token T_RBRACE '}'
+%token T_PERCENT '%'
+%token T_PLUS '+'
+%token T_MINUS '-'
+%token T_ASTERISK '*'
+%token T_SLASH '/'
+%token T_OR '|'
+%token T_AND '&'
+%token T_XOR '^'
+%token T_LBRACKET '['
+%token T_RBRACKET ']'
+%token T_NOT '!'
+%token T_ASSIGN '='
+%token T_LESSER '<'
+%token T_GREATER '>'
+%token T_EQ "=="
+%token T_NEQ "!="
+%token T_LEQ "<="
+%token T_GEQ ">="
+%token T_ADD_ASSIGN "+="
+%token T_SUB_ASSIGN "-="
+%token T_MUL_ASSIGN "*="
+%token T_DIV_ASSIGN "/="
+%token T_MOD_ASSIGN "%="
 
-// Tokens.
+// Miscellaneous
 %token <str> SYMBOL
 
-%token VAR "var"
-%token FUNCTION "function"
-
-%token ASYNC "async"
-%token AWAIT "await"
+// Keywords
+%token KW_VAR "var"
+%token KW_FUNCTION "function"
+%token KW_RETURN "return"
+%token KW_ASYNC "async"
+%token KW_AWAIT "await"
+%token KW_IF "if"
+%token KW_ELSE "else"
+%token KW_ELIF "elif"
+%token KW_BREAK "break"
+%token KW_CONTINUE "continue"
+%token KW_LOOP "loop"
+%token KW_FOR "for"
+%token KW_WHILE "while"
+%token KW_SWITCH "switch"
+%token KW_CASE "case"
+%token KW_DEFAULT "default"
+%token KW_PUBLIC "public"
+%token KW_IMPORT "import"
 
 %token <str> STR
 %token <i32> INT
@@ -63,42 +97,42 @@ void slakeerror(const char* msg, ...);
 statements:
 statements statement|
 statement |
-;
+%empty;
 
 statement:
-superCommand ';'|
-funcDecl|
-varDecls ';'
+funcDef|
+pubFuncDef|
+varDecls ';'|
+import ';'
 ;
 
-// Super command.
-superCommand:
-'@' SYMBOL
-{
-}|
-'@' SYMBOL superCommandParam
-{
-}
-;
-
-superCommandParam:
-superCommandParam value
-{
-
-}|
-value
+//
+// Import
+//
+import:
+"import" SYMBOL '=' STR
 {
 };
 
-// Function declaration.
-funcDecl:
-"function" SYMBOL '(' paramDef ')' '{' funcBody '}'
+//
+// Function definition.
+//
+funcDef:
+"function" SYMBOL '(' paramDef ')' '{' exprs '}'
 {
-}
+};
 
-funcBody: funcBody expr | expr;
+//
+// Public function definition.
+//
+pubFuncDef:
+"public" "function" SYMBOL '(' paramDef ')' '{' exprs '}'
+{
+};
 
-// Wrap for parameter definitions.
+//
+// Parameter definitions.
+//
 paramDef:
 paramDef ',' SYMBOL
 {
@@ -106,50 +140,122 @@ paramDef ',' SYMBOL
 SYMBOL
 {
 }|
-;
+%empty;
 
+//
 // General expression.
-expr:
+//
+exprs: exprs expr | expr | %empty;
+
+expr: singleExpr ';' | blockExpr;
+
+singleExpr:
+varDecls |
+valuedExprs;
+
+valuedExprs:
+valuedExprs valuedExpr|
+valuedExpr;
+
+valuedExpr:
+'(' valuedExpr ')'|
+varRef|
+value|
 funcCall|
-assignments ';';
+superFuncCall|
+externalFuncCall|
+assign|
+add|
+sub|
+mul|
+div|
+mod;
 
-// Assignment
-assignments:
-assignments ',' assignment|
-assignment
-;
+blockExpr:
+switchBlock;
 
-assignment:
-SYMBOL '=' SYMBOL
+//
+// Variable reference.
+//
+varRef:
+SYMBOL
 {
-}|
-SYMBOL '=' value
+}
+
+//
+// Basic mathematic operations.
+//
+assign:
+SYMBOL '=' valuedExpr
 {
 }|
 SYMBOL '=' '?'
 {
-}|
+};
+
+add:
+valuedExpr '+' valuedExpr
+{
+};
+
+sub:
+valuedExpr '-' valuedExpr
+{
+};
+
+mul:
+valuedExpr '*' valuedExpr
+{
+};
+
+div:
+valuedExpr '/' valuedExpr
+{
+};
+
+mod:
+valuedExpr '%' valuedExpr
+{
+};
 
 // Function call.
 funcCall:
-SYMBOL '(' ')'
-{
-}|
-SYMBOL '(' param ')'
+SYMBOL '(' params ')'
 {
 };
 
-// Wrap for parameters in function calls.
-param:
-param ',' value
-{
-
-}|
-value
+//
+// Super function call.
+//
+superFuncCall:
+'@' SYMBOL '(' params ')'
 {
 };
 
+//
+// External function call.
+//
+externalFuncCall:
+'@' SYMBOL SYMBOL '(' params ')'
+{
+};
+
+//
+// Parameters.
+//
+params:
+params ',' valuedExpr
+{
+
+}|
+valuedExpr
+{
+}|
+%empty;
+
+//
 // Variable declaration.
+//
 varDecls:
 "var" varDecls ',' varDecl |
 "var" varDecl
@@ -166,9 +272,31 @@ SYMBOL '=' '?'
 SYMBOL '=' SYMBOL
 {
 
-}
+};
 
-// Wrap for values.
+//
+// Switch block.
+//
+switchBlock:
+"switch" '(' valuedExpr ')' '{' switchBody '}';
+
+switchBody:
+switchCases|
+switchCases switchDefault;
+
+switchCases:
+switchCases switchCase|
+switchCase;
+
+switchCase:
+"case" valuedExpr '{' exprs '}'
+
+switchDefault:
+"default" '{' exprs '}'
+
+//
+// Values.
+//
 value:
 STR { $$.data.str = strdup($1), $$.type = VALUE_TYPE_STR; }|
 INT { $$.data.i32 = $1, $$.type = VALUE_TYPE_INT; }|

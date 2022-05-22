@@ -1,0 +1,14 @@
+public function copyFile(src, dest) {
+	var result = ?;
+	switch (__SLAKE_HOST__) {
+		case "WIN32" {
+			result = @shell("copy " + src + " " + dest);
+		}
+		case "UNIXLIKE" {
+			result = @shell("cp " + src + " " + dest);
+		}
+		default {
+			@panic("Unsupported host type");
+		}
+	}
+}

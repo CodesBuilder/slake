@@ -1,12 +1,4 @@
-#ifndef __UTIL_H__
-#define __UTIL_H__
-
-#include <stddef.h>
-
-typedef struct _UtilListHeader
-{
-	struct _UtilListHeader* next, *last;
-}UtilListHeader;
+#include <util/list.h>
 
 /**
  * @brief Iterator for lists.
@@ -15,7 +7,11 @@ typedef struct _UtilListHeader
  * @param offset Offset of list header structure in each node.
  * @return Next node.
  */
-UtilListHeader* utilListIterator(void* node, size_t offset);
+UtilListHeader *utilListIterator(UtilListHeader *node)
+{
+	return node->next;
+}
+
 /**
  * @brief Reversed iterator for lists.
  *
@@ -23,7 +19,11 @@ UtilListHeader* utilListIterator(void* node, size_t offset);
  * @param offset Offset of list header structure in each node.
  * @return Last node.
  */
-UtilListHeader* utilListReversedIterator(void* node, size_t offset);
+UtilListHeader *utilListReversedIterator(UtilListHeader *node)
+{
+	return node->last;
+}
+
 /**
  * @brief Insert a new node into a list in front.
  *
@@ -32,7 +32,14 @@ UtilListHeader* utilListReversedIterator(void* node, size_t offset);
  * @param offset Offset of list header structure in each node.
  * @return New node.
  */
-void* utilListInsertFront(void* node, void* newnode, size_t offset);
+UtilListHeader *utilListInsertFront(UtilListHeader *node, UtilListHeader *newnode)
+{
+	if (node->last)
+		node->last->next = newnode;
+	newnode->next = node;
+	return newnode;
+}
+
 /**
  * @brief Insert a new node into a list at the back.
  *
@@ -41,7 +48,14 @@ void* utilListInsertFront(void* node, void* newnode, size_t offset);
  * @param offset Offset of list header structure in each node.
  * @return New node.
  */
-void* utilListInsertBack(void* node, void* newnode, size_t offset);
+UtilListHeader *utilListInsertBack(UtilListHeader *node, UtilListHeader *newnode)
+{
+	if (node->next)
+		node->next->last = newnode;
+	newnode->last = node;
+	return newnode;
+}
+
 /**
  * @brief Remove a node from a list.
  *
@@ -49,6 +63,26 @@ void* utilListInsertBack(void* node, void* newnode, size_t offset);
  * @param offset
  * @return Next or last node if present, commonly always return the next if present.
  */
-void* utilListRemove(void* node, size_t offset);
+UtilListHeader *utilListRemove(UtilListHeader *node)
+{
+	if (node->last)
+		node->last->next = node->next;
+	if (node->next)
+		node->next->last = node->last;
+}
 
-#endif
+UtilListHeader* utilListGetFirst(UtilListHeader* node)
+{
+	UtilListHeader* i=node;
+	while(i->next!=NULL)
+		i=i->next;
+	return i;
+}
+
+UtilListHeader* utilListGetEnd(UtilListHeader* node)
+{
+	UtilListHeader* i=node;
+	while(i->last!=NULL)
+		i=i->last;
+	return i;
+}

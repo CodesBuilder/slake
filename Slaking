@@ -1,35 +1,33 @@
-@version 100;
+var CC = "clang";
+var LD = "lld -flavor gnu";
 
-var CC="clang";
-var LD="lld -flavor gnu";
-
-var CP=?;
-var MKDIR=?;
-var RM=?;
+var CP = ?;
+var MKDIR = ?;
+var RM = ?;
 
 function constructor() {
-	switch(__OS__) {
-		case "WINNT" {
-			CP="copy";
-			MKDIR="mkdir";
-			RM="del";
+	switch (__OS__) {
+		case ("WINNT") {
+			CP = "copy";
+			MKDIR = "mkdir";
+			RM = "del";
 		}
-		case "UNIXLIKE" {
-			CP="cp";
-			MKDIR="mkdir";
-			RM="rm";
+		case ("UNIXLIKE") {
+			CP = "cp";
+			MKDIR = "mkdir";
+			RM = "rm";
 		}
 		default {
-			%error "Incompatible OS type.";
-			%abort -1;
+			@error("Incompatible OS type.");
+			@abort(-1);
 		}
 	}
 }
 
-entry function all() {
+function all() {
 
 }
 
-private function compile_c(indir,filename,outdir) {
+function compile_c(indir,filename,outdir) {
 
 }

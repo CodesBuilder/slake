@@ -15,7 +15,7 @@ file(GLOB_RECURSE HAKE_HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
 
 file(GLOB_RECURSE COMMON_HEADERS ${PROJECT_SOURCE_DIR}/include/*.h)
 
-BISON_TARGET(slake src/slake.y ${PROJECT_BINARY_DIR}/slake.tab.c)
+BISON_TARGET(slake src/slake.y ${PROJECT_BINARY_DIR}/slake.tab.c COMPILE_FLAGS --verbose)
 FLEX_TARGET(slake src/slake.l ${PROJECT_BINARY_DIR}/slake.l.c)
 ADD_FLEX_BISON_DEPENDENCY(slake slake)
 
