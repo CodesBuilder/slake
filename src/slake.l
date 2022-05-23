@@ -35,6 +35,12 @@
 "public" { return KW_PUBLIC; }
 "import" { return KW_IMPORT; }
 
+"int" { return KW_TYPE_INT; }
+"long" { return KW_TYPE_LONG; }
+"uint" { return KW_TYPE_UINT; }
+"ulong" { return KW_TYPE_ULONG; }
+"string" { return KW_TYPE_STRING; }
+
 [a-zA-Z_][a-zA-Z0-9_]* {
 	if(strlen(slaketext) > SLAKE_SYMBOL_MAX + 1)
 	{
@@ -79,6 +85,8 @@
 "*" { return '*'; }
 "/" { return '/'; }
 "%" { return '%'; }
+"||" { return T_LOR; }
+"&&" { return T_LAND; }
 "|" { return '|'; }
 "&" { return '&'; }
 "^" { return '^'; }
@@ -97,6 +105,9 @@
 "*=" { return T_MUL_ASSIGN; }
 "/=" { return T_DIV_ASSIGN; }
 "%=" { return T_MOD_ASSIGN; }
+"|=" { return T_OR_ASSIGN; }
+"&=" { return T_AND_ASSIGN; }
+"^=" { return T_XOR_ASSIGN; }
 
 \" {
 	BEGIN(STRING);

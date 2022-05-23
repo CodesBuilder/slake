@@ -86,4 +86,16 @@ SlakeVariable *slakeGetVariable(SlakeScope *scope, const char *name);
 void slakeUndefFunction(SlakeScope *scope, const char *name);
 void slakeUndefVariable(SlakeScope *scope, const char *name);
 
+SlakeExpr* slakeAddExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeSubExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeMulExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeDivExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeModExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeOrExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeAndExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeXorExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeNotExpr(SlakeExpr* x);
+SlakeExpr* slakeLandExpr(SlakeExpr* x, SlakeExpr* y);
+SlakeExpr* slakeLorExpr(SlakeExpr* x, SlakeExpr* y);
+
 #endif

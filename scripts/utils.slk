@@ -1,5 +1,5 @@
-public function copyFile(src, dest) {
-	var result = ?;
+public function copyFile(src:string, dest:string) {
+	var result:int;
 	switch (__SLAKE_HOST__) {
 		case "WIN32" {
 			result = @shell("copy " + src + " " + dest);
@@ -11,4 +11,6 @@ public function copyFile(src, dest) {
 			@panic("Unsupported host type");
 		}
 	}
+
+	return result;
 }

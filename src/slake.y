@@ -5,6 +5,8 @@
 %}
 
 %define api.prefix {slake}
+%define parse.error verbose
+%locations
 
 %code requires {
 #include <slakedef.h>
@@ -25,41 +27,25 @@ void slakeerror(const char* msg, ...);
 	long long i64;
 	unsigned long long u64;
 	SlakeValue value;
+	SlakeValueType type;
 }
 
 // Tokens
-%token T_AT '@'
-%token T_COLON ':'
-%token T_SEMICOLON ';'
-%token T_COMMA ','
-%token T_DOLLAR '$'
-%token T_LPARENTHESE '('
-%token T_RPARENTHESE ')'
-%token T_LBRACE '{'
-%token T_RBRACE '}'
-%token T_PERCENT '%'
-%token T_PLUS '+'
-%token T_MINUS '-'
-%token T_ASTERISK '*'
-%token T_SLASH '/'
-%token T_OR '|'
-%token T_AND '&'
-%token T_XOR '^'
-%token T_LBRACKET '['
-%token T_RBRACKET ']'
-%token T_NOT '!'
-%token T_ASSIGN '='
-%token T_LESSER '<'
-%token T_GREATER '>'
 %token T_EQ "=="
 %token T_NEQ "!="
 %token T_LEQ "<="
 %token T_GEQ ">="
+%token T_LOR "||"
+%token T_LAND "&&"
+
 %token T_ADD_ASSIGN "+="
 %token T_SUB_ASSIGN "-="
 %token T_MUL_ASSIGN "*="
 %token T_DIV_ASSIGN "/="
 %token T_MOD_ASSIGN "%="
+%token T_OR_ASSIGN "|="
+%token T_AND_ASSIGN "&="
+%token T_XOR_ASSIGN "^="
 
 // Miscellaneous
 %token <str> SYMBOL
@@ -84,30 +70,49 @@ void slakeerror(const char* msg, ...);
 %token KW_PUBLIC "public"
 %token KW_IMPORT "import"
 
+// Type keywords
+%token KW_TYPE_INT "int"
+%token KW_TYPE_LONG "long"
+%token KW_TYPE_UINT "uint"
+%token KW_TYPE_ULONG "ulong"
+%token KW_TYPE_STRING "string"
+
 %token <str> STR
 %token <i32> INT
 %token <i64> LONG
 %token <u32> UINT
 %token <u64> ULONG
 
-%type <value> value
+%type <value> immediateValue
+%type <type> typeName
+
+%left '=' "+=" "-=" "*=" "/=" "%=" "|=" "&=" "^="
+%left "||"
+%left "&&"
+%left '|'
+%left '^'
+%left '&'
+%left "==" "!="
+%left '<' "<=" '>' ">="
+%left '+' '-'
+%left '*' '/' '%'
+
+%precedence '!' T_NEG
 
 %%
 
 statements:
 statements statement|
-statement |
 %empty;
 
 statement:
+import ';'|
+varDeclExpr ';'|
 funcDef|
-pubFuncDef|
-varDecls ';'|
-import ';'
-;
+pubFuncDef;
 
 //
-// Import
+// Module import.
 //
 import:
 "import" SYMBOL '=' STR
@@ -118,7 +123,7 @@ import:
 // Function definition.
 //
 funcDef:
-"function" SYMBOL '(' paramDef ')' '{' exprs '}'
+"function" SYMBOL '(' paramDefs ')' '{' execBody '}'
 {
 };
 
@@ -126,51 +131,64 @@ funcDef:
 // Public function definition.
 //
 pubFuncDef:
-"public" "function" SYMBOL '(' paramDef ')' '{' exprs '}'
+"public" "function" SYMBOL '(' paramDefs ')' '{' execBody '}'
 {
 };
 
 //
 // Parameter definitions.
 //
+paramDefs:
+paramDefs ',' paramDef | paramDef | %empty;
 paramDef:
-paramDef ',' SYMBOL
+SYMBOL ':' typeName
 {
-}|
-SYMBOL
-{
-}|
-%empty;
+};
 
 //
-// General expression.
+// Execution body.
 //
-exprs: exprs expr | expr | %empty;
+execBody: exprs | %empty;
 
+//
+// Expressions.
+//
+exprs: exprs expr | expr;
 expr: singleExpr ';' | blockExpr;
 
+//
+// Single expressions (need a semicolon to terminate).
+//
 singleExpr:
-varDecls |
+varDeclExpr |
+return |
+await |
 valuedExprs;
 
-valuedExprs:
-valuedExprs valuedExpr|
-valuedExpr;
-
+//
+// Valued expressions.
+//
+valuedExprs: valuedExprs ',' valuedExpr | valuedExpr;
 valuedExpr:
 '(' valuedExpr ')'|
-varRef|
-value|
+leftExpr|
+rightExpr;
+
+leftExpr:
+varRef;
+
+rightExpr:
+immediateValue|
 funcCall|
+asyncFuncCall|
 superFuncCall|
 externalFuncCall|
-assign|
-add|
-sub|
-mul|
-div|
-mod;
+asyncExternalFuncCall|
+mathExpr;
 
+//
+// Block expressions.
+//
 blockExpr:
 switchBlock;
 
@@ -185,42 +203,102 @@ SYMBOL
 //
 // Basic mathematic operations.
 //
-assign:
-SYMBOL '=' valuedExpr
+mathExpr:
+leftExpr '=' valuedExpr
 {
 }|
-SYMBOL '=' '?'
+leftExpr "+=" valuedExpr
 {
-};
-
-add:
+}|
+leftExpr "-=" valuedExpr
+{
+}|
+leftExpr "*=" valuedExpr
+{
+}|
+leftExpr "/=" valuedExpr
+{
+}|
+leftExpr "%=" valuedExpr
+{
+}|
+leftExpr "|=" valuedExpr
+{
+}|
+leftExpr "&=" valuedExpr
+{
+}|
+leftExpr "^=" valuedExpr
+{
+}|
 valuedExpr '+' valuedExpr
 {
-};
-
-sub:
+}|
 valuedExpr '-' valuedExpr
 {
-};
-
-mul:
+}|
 valuedExpr '*' valuedExpr
 {
-};
-
-div:
+}|
 valuedExpr '/' valuedExpr
 {
-};
-
-mod:
+}|
 valuedExpr '%' valuedExpr
+{
+}|
+valuedExpr '|' valuedExpr
+{
+}|
+valuedExpr '&' valuedExpr
+{
+}|
+valuedExpr '^' valuedExpr
+{
+}|
+valuedExpr "||" valuedExpr
+{
+}|
+valuedExpr "&&" valuedExpr
+{
+}|
+valuedExpr '<' valuedExpr
+{
+}|
+valuedExpr "<=" valuedExpr
+{
+}|
+valuedExpr '>' valuedExpr
+{
+}|
+valuedExpr ">=" valuedExpr
+{
+}|
+valuedExpr "==" valuedExpr
+{
+}|
+valuedExpr "!=" valuedExpr
+{
+}|
+'!' valuedExpr
+{
+}|
+'-' valuedExpr %prec T_NEG
 {
 };
 
+//
 // Function call.
+//
 funcCall:
 SYMBOL '(' params ')'
+{
+};
+
+//
+// Asynchronous function call.
+//
+asyncFuncCall:
+SYMBOL '(' params ')' "async"
 {
 };
 
@@ -241,6 +319,33 @@ externalFuncCall:
 };
 
 //
+// Asynchronous external function call.
+//
+asyncExternalFuncCall:
+'@' SYMBOL SYMBOL '(' params ')' "async"
+{
+};
+
+//
+// Return.
+//
+return:
+"return" valuedExpr
+{
+}|
+"return"
+{
+};
+
+//
+// Await
+//
+await:
+"await" valuedExpr
+{
+};
+
+//
 // Parameters.
 //
 params:
@@ -256,20 +361,14 @@ valuedExpr
 //
 // Variable declaration.
 //
-varDecls:
-"var" varDecls ',' varDecl |
-"var" varDecl
-
+varDeclExpr: "var" varDecls;
+varDecls: varDecls ',' varDecl | varDecl;
 varDecl:
-SYMBOL '=' value
+SYMBOL ':' typeName '=' valuedExpr
 {
 
 }|
-SYMBOL '=' '?'
-{
-
-}|
-SYMBOL '=' SYMBOL
+SYMBOL ':' typeName
 {
 
 };
@@ -279,25 +378,30 @@ SYMBOL '=' SYMBOL
 //
 switchBlock:
 "switch" '(' valuedExpr ')' '{' switchBody '}';
+switchBody: switchCases switchDefault;
 
-switchBody:
-switchCases|
-switchCases switchDefault;
-
-switchCases:
-switchCases switchCase|
-switchCase;
-
+switchCases: switchCases switchCase | switchCase;
 switchCase:
-"case" valuedExpr '{' exprs '}'
+"case" valuedExpr '{' execBody '}'
 
 switchDefault:
-"default" '{' exprs '}'
+"default" '{' execBody '}'|
+%empty;
+
+//
+// Value types.
+//
+typeName:
+"int" { $$ = VALUE_TYPE_INT; }|
+"uint" { $$ = VALUE_TYPE_UINT; }|
+"long" { $$ = VALUE_TYPE_LONG; }|
+"ulong" { $$ = VALUE_TYPE_ULONG; }|
+"string" { $$ = VALUE_TYPE_STR; };
 
 //
 // Values.
 //
-value:
+immediateValue:
 STR { $$.data.str = strdup($1), $$.type = VALUE_TYPE_STR; }|
 INT { $$.data.i32 = $1, $$.type = VALUE_TYPE_INT; }|
 UINT { $$.data.u32 = $1, $$.type = VALUE_TYPE_UINT; }|

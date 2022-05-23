@@ -1,33 +1,8 @@
-var CC = "clang";
-var LD = "lld -flavor gnu";
+import utils = "scripts/utils.slk";
 
-var CP = ?;
-var MKDIR = ?;
-var RM = ?;
-
-function constructor() {
-	switch (__OS__) {
-		case ("WINNT") {
-			CP = "copy";
-			MKDIR = "mkdir";
-			RM = "del";
-		}
-		case ("UNIXLIKE") {
-			CP = "cp";
-			MKDIR = "mkdir";
-			RM = "rm";
-		}
-		default {
-			@error("Incompatible OS type.");
-			@abort(-1);
-		}
-	}
-}
+var CC:string = "clang";
+var LD:string = "lld -flavor gnu";
 
 function all() {
-
-}
-
-function compile_c(indir,filename,outdir) {
 
 }
