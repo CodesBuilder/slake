@@ -8,7 +8,6 @@
 #ifdef _WIN32
 typedef struct _SlakeTask
 {
-	UtilListHeader listHeader;
 	HANDLE hThread;
 }SlakeTask;
 
@@ -34,7 +33,6 @@ SlakeTask *slakeCreateTask(SlakeTaskProc proc)
 void slakeKillTask(SlakeTask* task)
 {
 	#ifdef _WIN32
-	utilListRemove(&(task->listHeader));
 	TerminateThread(task->hThread, 0xffffffff);
 	CloseHandle(task->hThread);
 	#endif

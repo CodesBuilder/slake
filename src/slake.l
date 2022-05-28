@@ -117,6 +117,8 @@
 	slakelval.str = realloc(
 		slakelval.str,
 		(strlen(slakelval.str) + slakeleng + 1) * sizeof(char));
+	if(!slakelval.str)
+		slakePanic("Out of memory");
 	strcat(slakelval.str,slaketext);
 }
 
@@ -138,6 +140,8 @@
 	slakelval.str = realloc(
 		slakelval.str,
 		(strlen(slakelval.str) + slakeleng + 1) * sizeof(char));
+	if(!slakelval.str)
+		slakePanic("Out of memory");
 	strcat(slakelval.str,"\b");
 
 	BEGIN(STRING);

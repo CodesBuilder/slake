@@ -2,6 +2,62 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <slakedef.h>
+#include <assert.h>
+
+static SlakeExecBody currentExecBody = NULL;
+static SlakeSwitchCase** currentSwitchCases = NULL;
+static size_t currentSwitchCaseCount = 0;
+
+//
+// Push an expression into current execution body.
+//
+static void pushExpr(SlakeExpr* expr)
+{
+	assert(expr!=NULL);
+
+	if(!currentExecBody)
+		currentExecBody = slakeCreateExecBody();
+
+	slakeExprAttach(currentExecBody, expr);
+}
+
+//
+// Get current execution body and reset for new execution body.
+//
+static SlakeExecBody postCurrentExecBody()
+{
+	SlakeExecBody execBody = currentExecBody;
+	currentExecBody = NULL;
+	return execBody;
+}
+
+//
+// Push a switch case.
+//
+static void pushSwitchCase(SlakeSwitchCase* swCase)
+{
+	if(!currentSwitchCases)
+		currentSwitchCases = malloc(sizeof(SlakeSwitchCase));
+	else
+		currentSwitchCases = realloc(currentSwitchCases, sizeof(SlakeSwitchCase*) * (currentSwitchCaseCount + 1));
+
+	if(!currentSwitchCases)
+		slakePanic("Out of memory");
+
+	currentSwitchCases[currentSwitchCaseCount] = swCase;
+	currentSwitchCaseCount++;
+}
+
+//
+// Get current switch cases and reset for new switch cases.
+//
+static SlakeSwitchCase** postCurrentSwitchCases()
+{
+	SlakeSwitchCase** swCases = currentSwitchCases;
+	currentSwitchCases = NULL;
+	return swCases;
+}
 %}
 
 %define api.prefix {slake}
@@ -26,8 +82,11 @@ void slakeerror(const char* msg, ...);
 	unsigned int u32;
 	long long i64;
 	unsigned long long u64;
-	SlakeValue value;
+	SlakeValue* value;
 	SlakeValueType type;
+	SlakeExpr* expr;
+	SlakeExecBody execBody;
+	SlakeSwitchCase* swCase;
 }
 
 // Tokens
@@ -86,6 +145,33 @@ void slakeerror(const char* msg, ...);
 %type <value> immediateValue
 %type <type> typeName
 
+%type <execBody> execBody
+%type <execBody> exprs
+%type <expr> leftExpr
+%type <expr> rightExpr
+%type <expr> valuedExprs
+%type <expr> valuedExpr
+%type <expr> expr
+%type <expr> singleExpr
+%type <expr> blockExpr
+
+%type <expr> funcCall
+%type <expr> asyncFuncCall
+%type <expr> superFuncCall
+%type <expr> externalFuncCall
+%type <expr> asyncExternalFuncCall
+
+%type <expr> return
+%type <expr> await
+
+%type <expr> varRef
+
+%type <expr> basicOp
+
+%type <expr> switchBlock
+%type <swCase> switchCase
+%type <execBody> switchDefault
+
 %left '=' "+=" "-=" "*=" "/=" "%=" "|=" "&=" "^="
 %left "||"
 %left "&&"
@@ -117,6 +203,9 @@ pubFuncDef;
 import:
 "import" SYMBOL '=' STR
 {
+	SlakeValue* value = slakeMakeString($2);
+	slakeSetVariable(slakeGetRootScope(), $2, value);
+	slakeDestroyValue(value);
 };
 
 //
@@ -148,49 +237,63 @@ SYMBOL ':' typeName
 //
 // Execution body.
 //
-execBody: exprs | %empty;
+execBody: exprs { $$ = postCurrentExecBody(); } | %empty;
 
 //
 // Expressions.
 //
-exprs: exprs expr | expr;
-expr: singleExpr ';' | blockExpr;
+exprs:
+exprs expr { pushExpr($2); } |
+expr { pushExpr($1); };
+
+expr:
+singleExpr ';' { $$ = $1; } |
+blockExpr { $$ = $1; };
 
 //
 // Single expressions (need a semicolon to terminate).
 //
 singleExpr:
-varDeclExpr |
-return |
-await |
-valuedExprs;
+varDeclExpr { $$ = NULL; } |
+return { $$ = $1; } |
+await { $$ = $1; } |
+valuedExprs { $$ = $1; };
 
 //
 // Valued expressions.
 //
-valuedExprs: valuedExprs ',' valuedExpr | valuedExpr;
+valuedExprs:
+valuedExprs ',' valuedExpr
+{
+	pushExpr($3);
+}|
+valuedExpr
+{
+	pushExpr($1);
+};
+
 valuedExpr:
-'(' valuedExpr ')'|
-leftExpr|
-rightExpr;
+'(' valuedExpr ')' { $$ = $2; }|
+leftExpr { $$ = $1; }|
+rightExpr { $$ = $1; };
 
 leftExpr:
-varRef;
+varRef { $$ = $1; };
 
 rightExpr:
-immediateValue|
-funcCall|
-asyncFuncCall|
-superFuncCall|
-externalFuncCall|
-asyncExternalFuncCall|
-mathExpr;
+immediateValue { $$ = slakeExprImmediateValue($1); slakeDestroyValue($1); }|
+funcCall { $$ = $1; }|
+asyncFuncCall { $$ = $1; }|
+superFuncCall { $$ = $1; }|
+externalFuncCall { $$ = $1; }|
+asyncExternalFuncCall { $$ = $1; }|
+basicOp { $$ = $1; };
 
 //
 // Block expressions.
 //
 blockExpr:
-switchBlock;
+switchBlock { $$ = $1; };
 
 //
 // Variable reference.
@@ -198,93 +301,41 @@ switchBlock;
 varRef:
 SYMBOL
 {
+	SlakeExpr* expr = slakeExprVarRef($1);
+	$$ = expr;
 }
 
 //
-// Basic mathematic operations.
+// Basic operators.
 //
-mathExpr:
-leftExpr '=' valuedExpr
-{
-}|
-leftExpr "+=" valuedExpr
-{
-}|
-leftExpr "-=" valuedExpr
-{
-}|
-leftExpr "*=" valuedExpr
-{
-}|
-leftExpr "/=" valuedExpr
-{
-}|
-leftExpr "%=" valuedExpr
-{
-}|
-leftExpr "|=" valuedExpr
-{
-}|
-leftExpr "&=" valuedExpr
-{
-}|
-leftExpr "^=" valuedExpr
-{
-}|
-valuedExpr '+' valuedExpr
-{
-}|
-valuedExpr '-' valuedExpr
-{
-}|
-valuedExpr '*' valuedExpr
-{
-}|
-valuedExpr '/' valuedExpr
-{
-}|
-valuedExpr '%' valuedExpr
-{
-}|
-valuedExpr '|' valuedExpr
-{
-}|
-valuedExpr '&' valuedExpr
-{
-}|
-valuedExpr '^' valuedExpr
-{
-}|
-valuedExpr "||" valuedExpr
-{
-}|
-valuedExpr "&&" valuedExpr
-{
-}|
-valuedExpr '<' valuedExpr
-{
-}|
-valuedExpr "<=" valuedExpr
-{
-}|
-valuedExpr '>' valuedExpr
-{
-}|
-valuedExpr ">=" valuedExpr
-{
-}|
-valuedExpr "==" valuedExpr
-{
-}|
-valuedExpr "!=" valuedExpr
-{
-}|
-'!' valuedExpr
-{
-}|
-'-' valuedExpr %prec T_NEG
-{
-};
+basicOp:
+leftExpr '=' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, $3); }|
+leftExpr "+=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_ADD, $1, $3)); }|
+leftExpr "-=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_SUB, $1, $3)); }|
+leftExpr "*=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_MUL, $1, $3)); }|
+leftExpr "/=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_DIV, $1, $3)); }|
+leftExpr "%=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_MOD, $1, $3)); }|
+leftExpr "|=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_OR, $1, $3)); }|
+leftExpr "&=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_AND, $1, $3)); }|
+leftExpr "^=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOV, $1, slakeExprBinary(BINARY_EXPR_XOR, $1, $3)); }|
+valuedExpr '+' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_ADD, $1, $3); }|
+valuedExpr '-' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_SUB, $1, $3); }|
+valuedExpr '*' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MUL, $1, $3); }|
+valuedExpr '/' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_DIV, $1, $3); }|
+valuedExpr '%' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_MOD, $1, $3); }|
+valuedExpr '|' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_OR, $1, $3); }|
+valuedExpr '&' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_AND, $1, $3); }|
+valuedExpr '^' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_XOR, $1, $3); }|
+valuedExpr "||" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_LOR, $1, $3); }|
+valuedExpr "&&" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_LAND, $1, $3); }|
+valuedExpr '<' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_LT, $1, $3); }|
+valuedExpr "<=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_LTEQ, $1, $3); }|
+valuedExpr '>' valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_GT, $1, $3); }|
+valuedExpr ">=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_GTEQ, $1, $3); }|
+valuedExpr "==" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_EQ, $1, $3); }|
+valuedExpr "!=" valuedExpr { $$ = slakeExprBinary(BINARY_EXPR_NEQ, $1, $3); }|
+'!' valuedExpr { $$ = slakeExprUnary(UNARY_EXPR_NOT, $2); }|
+'-' valuedExpr %prec T_NEG { $$ = slakeExprUnary(UNARY_EXPR_NEG, $2); };
 
 //
 // Function call.
@@ -314,7 +365,7 @@ superFuncCall:
 // External function call.
 //
 externalFuncCall:
-'@' SYMBOL SYMBOL '(' params ')'
+SYMBOL SYMBOL '(' params ')'
 {
 };
 
@@ -322,7 +373,7 @@ externalFuncCall:
 // Asynchronous external function call.
 //
 asyncExternalFuncCall:
-'@' SYMBOL SYMBOL '(' params ')' "async"
+SYMBOL SYMBOL '(' params ')' "async"
 {
 };
 
@@ -343,6 +394,7 @@ return:
 await:
 "await" valuedExpr
 {
+	$$ = slakeExprAwait($2);
 };
 
 //
@@ -377,16 +429,58 @@ SYMBOL ':' typeName
 // Switch block.
 //
 switchBlock:
-"switch" '(' valuedExpr ')' '{' switchBody '}';
-switchBody: switchCases switchDefault;
+"switch" '(' valuedExpr ')' '{' switchCases switchDefault '}'
+{
+	$$ = slakeExprSwitch($3, postCurrentSwitchCases(), currentSwitchCaseCount, $7);
+	currentSwitchCaseCount = 0;
+}|
+"switch" '(' valuedExpr ')' '{' switchCases '}'
+{
+	$$ = slakeExprSwitch($3, postCurrentSwitchCases(), currentSwitchCaseCount, NULL);
+};
 
-switchCases: switchCases switchCase | switchCase;
+switchCases: switchCases switchCase
+{
+	pushSwitchCase($2);
+}|
+switchCase
+{
+	pushSwitchCase($1);
+};
+
 switchCase:
 "case" valuedExpr '{' execBody '}'
+{
+	$$ = slakeCreateSwitchCase($2, $4);
+};
 
 switchDefault:
-"default" '{' execBody '}'|
-%empty;
+"default" '{' execBody '}'
+{
+	$$ = $3;
+};
+
+//
+// If blocks.
+//
+ifBlock:
+if |
+ifBlock elif |
+ifBlock else;
+
+if:
+"if" '(' valuedExpr ')' '{' execBody '}'
+{
+};
+elif:
+"elif" '(' valuedExpr ')' '{' execBody '}'
+{
+};
+else:
+"else" '{' execBody '}'
+{
+
+};
 
 //
 // Value types.
@@ -402,10 +496,10 @@ typeName:
 // Values.
 //
 immediateValue:
-STR { $$.data.str = strdup($1), $$.type = VALUE_TYPE_STR; }|
-INT { $$.data.i32 = $1, $$.type = VALUE_TYPE_INT; }|
-UINT { $$.data.u32 = $1, $$.type = VALUE_TYPE_UINT; }|
-LONG { $$.data.i64 = $1, $$.type = VALUE_TYPE_LONG; }|
-ULONG { $$.data.u64 = $1, $$.type = VALUE_TYPE_ULONG; };
+STR { $$ = slakeMakeString($1); }|
+INT { $$ = slakeMakeInt($1); }|
+UINT { $$ = slakeMakeUInt($1); }|
+LONG { $$ = slakeMakeLong($1); }|
+ULONG { $$ = slakeMakeULong($1); };
 
 %%
